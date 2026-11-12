@@ -8,11 +8,14 @@ on:
         required: true
         default: ''
         type: string
-      zip_url:
-        description: 'url to zip of json'
+      brand:
+        description: 'Marke (pas oder carspider)'
         required: true
-        default: ''
-        type: string
+        default: 'pas'
+        type: choice
+        options:
+          - pas
+          - carspider
       app_version:
         description: 'custom app version string (overrides build version)'
         required: false
@@ -46,9 +49,9 @@ env:
 
 jobs:
   setup:
-    uses: ./.github/workflows/fetch-encrypted-secrets.yml
-    with:
-      zip_url_json: ${{ inputs.zip_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "brand ${{ inputs.brand }}, RustDesk ${{ inputs.version }}"
 
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
@@ -87,24 +90,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         
-      - uses: actions/download-artifact@v4
+      - name: Load brand config
+        uses: ./.github/actions/load-config
         with:
-          name: encrypted-secrets-zip
+          brand: ${{ inputs.brand }}
 
-      - name: Load Secrets
-        uses: ./.github/actions/decrypt-secrets
-        with:
-          zip_password: ${{ secrets.ZIP_PASSWORD }}
-
-      - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
-        continue-on-error: true
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: "${{ secrets.GENURL }}/cleanzip"
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -142,7 +132,7 @@ jobs:
         if: ${{ env.update_public_key != '' }}
         shell: bash
         run: |
-          curl -sSL -o allow_custom_update.py https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allow_custom_update.py
+          curl -sSL -o allow_custom_update.py https://raw.githubusercontent.com/MHB-Markt-und-Motor-GmbH/rdgen/refs/heads/mhb/.github/patches/allow_custom_update.py
           python3 allow_custom_update.py \
             --rustdesk-root . \
             --update-url "${{ env.downloadLink}}/api/version/latest" \
@@ -287,11 +277,11 @@ jobs:
           retry_wait_seconds: 15
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py
+            wget https://raw.githubusercontent.com/MHB-Markt-und-Motor-GmbH/rdgen/refs/heads/mhb/.github/patches/allowCustom.py
             python allowCustom.py
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/forcePresetPassword.py
+            wget https://raw.githubusercontent.com/MHB-Markt-und-Motor-GmbH/rdgen/refs/heads/mhb/.github/patches/forcePresetPassword.py
             python forcePresetPassword.py
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
+            wget https://raw.githubusercontent.com/MHB-Markt-und-Motor-GmbH/rdgen/refs/heads/mhb/.github/patches/removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
             # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
           
@@ -362,8 +352,8 @@ jobs:
           # Download icon using curl with additional SSL options
           curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
             -H "User-Agent: Mozilla/5.0" \
-            "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}" \
-            -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
+            "${{ env.iconlink_url }}/${{ env.iconlink_file }}" \
+            -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ env.iconlink_url }}/${{ env.iconlink_file }}"
             
           # Backup existing files (if they exist)
           [ -f "./res/32x32.png" ] && mv ./res/32x32.png ./res/32x32.png.bak
@@ -508,14 +498,14 @@ jobs:
         continue-on-error: true
         if: env.xOffline == 'true'
         run: |
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
+          wget https://raw.githubusercontent.com/MHB-Markt-und-Motor-GmbH/rdgen/refs/heads/mhb/.github/patches/xoffline.diff
           git apply xoffline.diff
 
       - name: hide-cm
         continue-on-error: true
         if: env.hidecm == 'true'
         run: |
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff
+          wget https://raw.githubusercontent.com/MHB-Markt-und-Motor-GmbH/rdgen/refs/heads/mhb/.github/patches/hidecm.diff
           git apply hidecm.diff
 
       - name: removeNewVersionNotif
@@ -654,11 +644,11 @@ jobs:
           mkdir -p "$ASSETS_DIR"
           curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
             -H "User-Agent: Mozilla/5.0" \
-            "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}" \
+            "${{ env.logolink_url }}/${{ env.logolink_file }}" \
             -o "$ASSETS_DIR/logo.png" || \
           wget --no-check-certificate \
             -O "$ASSETS_DIR/logo.png" \
-            "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}"
+            "${{ env.logolink_url }}/${{ env.logolink_file }}"
 
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
@@ -791,6 +781,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.filename }}-macos-${{ matrix.job.arch }}
+          path: ${{ github.workspace }}/${{ env.filename }}-${{ matrix.job.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 30
+
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         shell: bash
@@ -813,13 +811,3 @@ jobs:
             -F "file=@$GITHUB_WORKSPACE/${{ env.filename }}-${{ matrix.job.arch }}.dmg" \
             "${{ env.apiServer }}/api/save_custom_client"
 
-  cleanup:
-    needs: [build-for-macos]
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    if: always()
-    steps:
-      - name: Delete secrets artifact
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: encrypted-secrets-zip

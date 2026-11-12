@@ -3,6 +3,9 @@ name: build RustDeskTempTopMostWindow
 on:
   workflow_call:
     inputs:
+        brand:
+            type: string
+            default: 'pas'
         rustdesk-version:
             description: 'RustDesk version, used to select a compatible privacy DLL'
             type: string
@@ -48,24 +51,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v5
+      - name: Load brand config
+        uses: ./.github/actions/load-config
         with:
-          name: encrypted-secrets-zip
+          brand: ${{ inputs.brand }}
 
-      - name: Load Secrets
-        uses: ./.github/actions/decrypt-secrets
-        with:
-          zip_password: ${{ secrets.ZIP_PASSWORD }}
-
-      - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
-        continue-on-error: true
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: "${{ secrets.GENURL }}/cleanzip"
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Download the source code
         run: |
@@ -83,7 +73,7 @@ jobs:
             git checkout ecd8d6a139eee76845ea66423fb739af450fda90
             if ($LASTEXITCODE -ne 0) { throw "Failed to checkout privacy DLL source" }
             if ($env:privacylink_url-ne "false") {
-              Invoke-WebRequest -Uri ${{ env.privacylink_url }}/get_png?filename=${{ env.privacylink_file }}"&"uuid=${{ env.privacylink_uuid }} -OutFile privacy.png
+              Invoke-WebRequest -Uri ${{ env.privacylink_url }}/${{ env.privacylink_file }} -OutFile privacy.png
               python "$env:GITHUB_WORKSPACE/.github/patches/privacyScreen.py"
               if ($LASTEXITCODE -ne 0) { throw "Failed to convert privacy image" }
               rm ./WindowInjection/img.cpp

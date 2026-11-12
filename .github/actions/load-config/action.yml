@@ -1,0 +1,34 @@
+name: 'Load MHB brand config'
+description: 'Liest mhb/<brand>/config.json und schreibt die Werte als Umgebungsvariablen (ersetzt den rdgen-Server).'
+inputs:
+  brand:
+    description: 'pas oder carspider'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Load config
+      shell: python
+      env:
+        PYTHONUTF8: "1"
+        BRAND: ${{ inputs.brand }}
+      run: |
+        import base64, json, os, re
+
+        brand = os.environ["BRAND"]
+        if not re.fullmatch(r"[a-z]+", brand):
+            raise SystemExit(f"invalid brand: {brand!r}")
+        path = os.path.join(os.environ["GITHUB_WORKSPACE"], "mhb", brand, "config.json")
+        with open(path, encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        custom = cfg.pop("custom")
+        cfg["custom"] = base64.b64encode(json.dumps(custom).encode("ascii")).decode("ascii")
+
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+            for k, v in cfg.items():
+                if "\n" in str(v):
+                    raise SystemExit(f"newline in {k}")
+                env.write(f"{k}={v}\n")
+        print(f"Loaded {len(cfg)} values for {brand}: appname={cfg['appname']} server={cfg['server']}")
