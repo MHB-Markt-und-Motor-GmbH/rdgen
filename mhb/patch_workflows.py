@@ -111,7 +111,7 @@ def macos():
     t = p.read_text(encoding="utf-8")
     t = common(t, p.name)
     # macos-15 (arm64) bekam mehrfach keinen Runner (Kapazität); macos-14 nicht mehr unterstützt, macos-latest ist arm64
-    t = sub(t, "              os: macos-15,\n", "              os: macos-14,\n", 1, name=p.name)
+    t = sub(t, "              os: macos-15,\n", "              os: macos-latest,\n", 1, name=p.name)
     t = sub(t, "      - name: send file to rdgen server\n", """      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
