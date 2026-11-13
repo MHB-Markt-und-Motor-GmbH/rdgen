@@ -1,0 +1,3 @@
+#!/bin/bash
+# Siehe python: aktuelles Python 3 statt Apples 3.9.
+exec /opt/homebrew/bin/python3.12 "$@"

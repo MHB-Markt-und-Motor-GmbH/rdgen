@@ -1,0 +1,4 @@
+#!/bin/bash
+# Die Workflows rufen `python` auf. Wie auf den GitHub-Runnern ein aktuelles Python 3
+# (die Patch-Skripte brauchen 3.10+, /usr/bin/python3 von Apple ist 3.9).
+exec /opt/homebrew/bin/python3.12 "$@"

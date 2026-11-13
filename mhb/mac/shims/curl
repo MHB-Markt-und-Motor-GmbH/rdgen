@@ -1,0 +1,19 @@
+#!/bin/bash
+# curl-Shim: Fork-URLs aus dem lokalen Checkout, Ausgabe mit -o.
+. "$(dirname "$0")/fetch-local.sh"
+out=""; url=""; args=("$@")
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o|--output) out="$2"; shift 2; continue ;;
+    -H|--header|--proto|-X|-F|-A|--user-agent) shift 2; continue ;;
+    http*://*) url="$1" ;;
+  esac
+  shift
+done
+src=$(local_path "$url")
+if [ -n "$src" ]; then
+  [ -f "$src" ] || { echo "curl-shim: $src fehlt" >&2; exit 22; }
+  if [ -n "$out" ]; then cp "$src" "$out"; else cat "$src"; fi
+  exit 0
+fi
+exec /usr/bin/curl "${args[@]}"

@@ -1,0 +1,18 @@
+#!/bin/bash
+# wget-Shim: Fork-URLs aus dem lokalen Checkout, Ausgabe mit -O oder unter dem Dateinamen der URL.
+. "$(dirname "$0")/fetch-local.sh"
+out=""; url=""; args=("$@")
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -O) out="$2"; shift 2; continue ;;
+    http*://*) url="$1" ;;
+  esac
+  shift
+done
+src=$(local_path "$url")
+if [ -n "$src" ]; then
+  [ -f "$src" ] || { echo "wget-shim: $src fehlt" >&2; exit 8; }
+  cp "$src" "${out:-$(basename "$url")}"
+  exit 0
+fi
+exec /opt/homebrew/bin/wget "${args[@]}"
